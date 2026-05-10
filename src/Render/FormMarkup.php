@@ -96,22 +96,28 @@ class FormMarkup
     /**
      * Returns the BEM block prefix for structural wrappers (section /
      * group / row / field column). The preview path uses
-     * `.form-preview__*` so it can have a self-contained stylesheet
-     * without piggybacking on the admin's `.form__grid` layout system;
-     * the public-facing path keeps the original `.form__*` classes.
+     * `.form-preview__*` so it can have a self-contained stylesheet for
+     * the admin builder; the public-facing path uses `.formbuilder__*`
+     * so consuming sites can style rendered forms independently of
+     * any project-level `.form` styles applied to hand-written forms.
      */
     private function classFor(string $element): string
     {
+        $preview = $this->preview;
         return match ($element) {
-            'section'             => $this->preview ? 'form-preview__section' : 'form__section',
-            'section-title'       => $this->preview ? 'form-preview__section-title' : 'form__section-title',
-            'section-description' => $this->preview ? 'form-preview__section-description' : 'form__section-description',
-            'group'               => $this->preview ? 'form-preview__group' : 'form__panel',
-            'group-description'   => $this->preview ? 'form-preview__group-description' : 'form__panel-description',
-            'group-empty'         => $this->preview ? 'form-preview__group-empty' : 'form__panel-empty',
-            'group-body'          => $this->preview ? 'form-preview__group-body' : 'form__group--wrapper',
-            'row'                 => $this->preview ? 'form-preview__row' : 'form__grid',
-            'field'               => $this->preview ? 'form-preview__field' : 'form__grid--col',
+            'section'             => $preview ? 'form-preview__section' : 'formbuilder__section',
+            'section-title'       => $preview ? 'form-preview__section-title' : 'formbuilder__section-title',
+            'section-description' => $preview
+                ? 'form-preview__section-description'
+                : 'formbuilder__section-description',
+            'group'               => $preview ? 'form-preview__group' : 'formbuilder__panel',
+            'group-description'   => $preview
+                ? 'form-preview__group-description'
+                : 'formbuilder__panel-description',
+            'group-empty'         => $preview ? 'form-preview__group-empty' : 'formbuilder__panel-empty',
+            'group-body'          => $preview ? 'form-preview__group-body' : 'formbuilder__panel-body',
+            'row'                 => $preview ? 'form-preview__row' : 'formbuilder__row',
+            'field'               => $preview ? 'form-preview__field' : 'formbuilder__field',
             default               => '',
         };
     }
@@ -131,7 +137,7 @@ class FormMarkup
         $attribs = $form->getAttributes();
         $defaults = [
             'method'       => 'post',
-            'class'        => 'form form--stacked',
+            'class'        => 'formbuilder__form formbuilder__form--stacked',
             'autocomplete' => 'on',
         ];
         foreach ($defaults as $key => $value) {
@@ -140,7 +146,7 @@ class FormMarkup
             }
         }
         if ($stepped) {
-            $attribs['class']             = trim((string) $attribs['class'] . ' form--stepped');
+            $attribs['class']             = trim((string) $attribs['class'] . ' formbuilder__form--stepped');
             $attribs['data-form-stepper'] = 'true';
         }
         if ($this->hasFileField($form)) {
@@ -222,17 +228,17 @@ class FormMarkup
             $active   = $isFirst ? ' is-active' : '';
 
             $html .= sprintf(
-                '<section class="form__step%s" data-form-step="%s"%s>',
+                '<section class="formbuilder__step%s" data-form-step="%s"%s>',
                 $active,
                 $stepKey,
                 $hidden,
             );
 
             if ($section->legend !== null && $section->legend !== '') {
-                $html .= '<h2 class="form__step-title">' . $this->escape($section->legend) . '</h2>';
+                $html .= '<h2 class="formbuilder__step-title">' . $this->escape($section->legend) . '</h2>';
             }
             if ($section->description !== null && $section->description !== '') {
-                $html .= '<p class="form__step-description">' . $this->escape($section->description) . '</p>';
+                $html .= '<p class="formbuilder__step-description">' . $this->escape($section->description) . '</p>';
             }
 
             $html .= $this->renderSectionBody($section, $form);
@@ -247,7 +253,7 @@ class FormMarkup
     /** @param list<SectionDefinition> $sections */
     private function renderStepNav(array $sections): string
     {
-        $html = '<ol class="form__steps" role="tablist">';
+        $html = '<ol class="formbuilder__steps" role="tablist">';
         foreach ($sections as $index => $section) {
             $isFirst  = $index === 0;
             $disabled = $isFirst ? '' : ' disabled';
@@ -257,8 +263,8 @@ class FormMarkup
                 : ucfirst(str_replace(['-', '_'], ' ', $section->key));
 
             $html .= sprintf(
-                '<li><button type="button" class="form__step-tab%s" data-form-step-target="%s"%s>'
-                    . '<span class="form__step-tab-index">%d</span> %s</button></li>',
+                '<li><button type="button" class="formbuilder__step-tab%s" data-form-step-target="%s"%s>'
+                    . '<span class="formbuilder__step-tab-index">%d</span> %s</button></li>',
                 $active,
                 $this->escape($section->key),
                 $disabled,
@@ -276,7 +282,7 @@ class FormMarkup
         bool $isFirst,
         bool $isLast,
     ): string {
-        $html = '<nav class="form__step-nav">';
+        $html = '<nav class="formbuilder__step-nav">';
         if (! $isFirst) {
             $html .= '<button type="button" class="btn" data-form-step-prev>Previous</button>';
         }
@@ -298,7 +304,7 @@ class FormMarkup
 
         $html = '<fieldset class="' . $this->classFor('group') . '">';
         if ($group->legend !== null && $group->legend !== '') {
-            $html .= '<legend>' . $this->escape($group->legend) . '</legend>';
+            $html .= '<legend class="formbuilder__legend">' . $this->escape($group->legend) . '</legend>';
         }
         if ($group->description !== null && $group->description !== '') {
             $html .= '<p class="' . $this->classFor('group-description') . '">'
@@ -366,7 +372,7 @@ class FormMarkup
         }
 
         $body = FormContentSanitizer::sanitize($raw);
-        $contentClass = $this->preview ? 'form-preview__content' : 'form__content';
+        $contentClass = $this->preview ? 'form-preview__content' : 'formbuilder__content';
 
         return '<div' . $this->htmlAttribs($colAttribs) . '>'
             . '<div class="' . $contentClass . '">' . $body . '</div>'
@@ -392,28 +398,38 @@ class FormMarkup
         $html = '<div' . $this->htmlAttribs($colAttribs) . '>';
 
         // Checkboxes draw their own label inline (the styled custom-checkbox
-        // UI uses an `<input type="checkbox" class="form__control--checkbox">`
+        // UI uses an `<input type="checkbox" class="formbuilder__control--checkbox">`
         // followed by a `<label for="…">`, so the label sits AFTER the input
         // rather than before). The renderCheckbox helper emits both.
         $isCheckbox = $element instanceof Checkbox;
 
         if (! $isCheckbox && $field->showLabel && $field->label !== null && $field->label !== '') {
-            $required = $field->required ? ' <abbr class="form__required" title="Required">*</abbr>' : '';
+            $labelClass = $field->required
+                ? 'formbuilder__label formbuilder__label--required'
+                : 'formbuilder__label';
             $html    .= sprintf(
-                '<label for="%s">%s%s</label>',
+                '<label class="%s" for="%s">%s</label>',
+                $labelClass,
                 $this->escape($field->name),
                 $this->escape($field->label),
-                $required,
             );
         }
 
-        $html .= $this->renderInput($element);
-
-        if ($field->description !== null && $field->description !== '') {
-            $html .= '<p class="form__description">' . $this->escape($field->description) . '</p>';
-        }
+        // The control(s) live inside an `__element` wrapper — that
+        // wrapper owns the positioning context for any absolutely
+        // placed bits (date-picker clear button, future affordances)
+        // so they sit relative to the input row, not the whole
+        // field (which would include the label height above).
+        $html .= '<div class="formbuilder__element">'
+            . $this->renderInput($element)
+            . '</div>';
 
         $html .= $this->renderErrors($form, $field->name);
+
+        if ($field->description !== null && $field->description !== '') {
+            $html .= '<p class="formbuilder__description">' . $this->escape($field->description) . '</p>';
+        }
+
         $html .= '</div>';
 
         return $html;
@@ -422,14 +438,14 @@ class FormMarkup
     private function renderActions(FormDefinition $definition, FormInterface $form): string
     {
         $alignment = $this->escape($definition->submitAlignment);
-        $html      = '<div class="form__actions form__actions--' . $alignment . '">';
+        $html      = '<div class="formbuilder__actions formbuilder__actions--' . $alignment . '">';
 
         if ($form->has(FormBuilderService::CSRF_NAME)) {
             $html .= $this->renderInput($form->get(FormBuilderService::CSRF_NAME));
         }
 
         if ($form->has(FormBuilderService::HONEYPOT_NAME)) {
-            $html .= '<div class="form__hid-wrapper" aria-hidden="true">'
+            $html .= '<div class="formbuilder__honeypot" aria-hidden="true">'
                 . $this->renderInput($form->get(FormBuilderService::HONEYPOT_NAME))
                 . '</div>';
         }
@@ -510,13 +526,13 @@ class FormMarkup
         }
         unset($attribs['type']);
 
-        // Single-value selects pick up `form__control--select` so the
+        // Single-value selects pick up `formbuilder__control--select` so the
         // project's chevron + appearance reset apply. Multi-selects keep
         // their native list rendering (no chevron makes sense).
         if (! $isMulti) {
             $class = (string) ($attribs['class'] ?? '');
-            if (strpos($class, 'form__control--select') === false) {
-                $attribs['class'] = trim($class . ' form__control--select');
+            if (strpos($class, 'formbuilder__control--select') === false) {
+                $attribs['class'] = trim($class . ' formbuilder__control--select');
             }
         }
 
@@ -541,7 +557,7 @@ class FormMarkup
         $isRadio  = $type === 'radio';
         $selected = $this->normaliseSelected($element->getValue());
 
-        $html = '<div class="form__control--checkbox-list">';
+        $html = '<div class="formbuilder__control--checkbox-list">';
         foreach ($element->getValueOptions() as $value => $label) {
             $inputId = sprintf('%s-%s', $name, preg_replace('/[^a-zA-Z0-9_-]/', '-', (string) $value));
             $attribs = [
@@ -549,14 +565,15 @@ class FormMarkup
                 'name'  => $isRadio ? $name : $name . '[]',
                 'id'    => $inputId,
                 'value' => (string) $value,
-                'class' => 'form__control--checkbox',
+                'class' => 'formbuilder__control--checkbox',
             ];
             if (in_array((string) $value, $selected, true)) {
                 $attribs['checked'] = 'checked';
             }
-            $html .= '<span class="form__control--checkbox-list-item">';
+            $html .= '<span class="formbuilder__control--checkbox-list-item">';
             $html .= '<input' . $this->htmlAttribs($attribs) . '>';
-            $html .= '<label for="' . $this->escape($inputId) . '">' . $this->escape((string) $label) . '</label>';
+            $html .= '<label class="formbuilder__label" for="' . $this->escape($inputId) . '">'
+                . $this->escape((string) $label) . '</label>';
             $html .= '</span>';
         }
         $html .= '</div>';
@@ -572,14 +589,15 @@ class FormMarkup
             $attribs['id'] = $element->getName();
         }
 
-        // Replace the generic `form__control` class with `form__control--checkbox`
-        // so the project's hidden-input + sibling-label custom-checkbox UI
-        // applies (the AbstractFieldType always sets `form__control` because
-        // most field types want it; only the checkbox swap happens here).
+        // Replace the generic `formbuilder__control` class with
+        // `formbuilder__control--checkbox` so the project's hidden-input +
+        // sibling-label custom-checkbox UI applies (the AbstractFieldType
+        // always sets `formbuilder__control` because most field types want
+        // it; only the checkbox swap happens here).
         $class = (string) ($attribs['class'] ?? '');
-        $class = trim((string) preg_replace('/\bform__control\b/', 'form__control--checkbox', $class));
-        if (strpos($class, 'form__control--checkbox') === false) {
-            $class = trim('form__control--checkbox ' . $class);
+        $class = trim((string) preg_replace('/\bformbuilder__control\b/', 'formbuilder__control--checkbox', $class));
+        if (strpos($class, 'formbuilder__control--checkbox') === false) {
+            $class = trim('formbuilder__control--checkbox ' . $class);
         }
         $attribs['class'] = $class;
 
@@ -603,7 +621,11 @@ class FormMarkup
 
         $label     = (string) ($element->getLabel() ?? '');
         $labelHtml = $label !== ''
-            ? sprintf('<label for="%s">%s</label>', $this->escape((string) $attribs['id']), $this->escape($label))
+            ? sprintf(
+                '<label class="formbuilder__label" for="%s">%s</label>',
+                $this->escape((string) $attribs['id']),
+                $this->escape($label),
+            )
             : '';
 
         return $hidden . '<input' . $this->htmlAttribs($attribs) . '>' . $labelHtml;
@@ -642,7 +664,7 @@ class FormMarkup
             $items .= '<li>' . $this->escape((string) $message) . '</li>';
         }
 
-        return '<ul class="form__errors">' . $items . '</ul>';
+        return '<ul class="formbuilder__errors">' . $items . '</ul>';
     }
 
     private function escape(string $value): string

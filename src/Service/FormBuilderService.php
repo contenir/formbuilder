@@ -46,7 +46,7 @@ class FormBuilderService
     {
         $builder = new BuilderForm();
         $builder->setAttribute('method', 'post');
-        $builder->setAttribute('class', 'form form--stacked');
+        $builder->setAttribute('class', 'formbuilder__form formbuilder__form--stacked');
         $builder->setAttribute('autocomplete', 'on');
 
         $inputFilter  = new InputFilter();
@@ -165,7 +165,6 @@ class FormBuilderService
         $element->setAttribute('autocomplete', 'off');
         $element->setAttribute('tabindex', '-1');
         $element->setAttribute('aria-hidden', 'true');
-        $element->setAttribute('class', 'form__hid');
         return $element;
     }
 

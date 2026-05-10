@@ -89,7 +89,7 @@ abstract class AbstractFieldType implements FieldTypeInterface
         }
 
         $existingClass = (string) ($element->getAttribute('class') ?? '');
-        $element->setAttribute('class', trim('form__control ' . $existingClass));
+        $element->setAttribute('class', trim('formbuilder__control ' . $existingClass));
 
         $this->applyHtml5Hints($element, $field);
 

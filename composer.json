@@ -18,7 +18,8 @@
         "laminas/laminas-form": "^3.20",
         "laminas/laminas-inputfilter": "^2.30",
         "laminas/laminas-validator": "^2.50 || ^3.0",
-        "laminas/laminas-filter": "^2.30"
+        "laminas/laminas-filter": "^2.30",
+        "psr/log": "^1.0 || ^2.0 || ^3.0"
     },
     "require-dev": {
         "contenir/storage": "^0.1.0",

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Contenir\FormBuilder\Service;
 
+use Contenir\FormBuilder\Definition\FieldDefinition;
 use Contenir\FormBuilder\Definition\FormDefinition;
 
 /**
@@ -12,7 +13,9 @@ use Contenir\FormBuilder\Definition\FormDefinition;
  * Built-in namespaces:
  *  - `field:<name>`  → submitted value for the named field
  *  - `form:<attr>`   → form-level attribute (title, slug, description)
- *  - `entry:<attr>`  → entry attribute (id, date, ip, status)
+ *  - `entry:<attr>`  → entry attribute (id, date, ip, status), plus
+ *                      `entry:fields` which expands to an inline-styled
+ *                      HTML table of every visible field's label and value
  *  - `site:<attr>`   → site-level attribute (admin_url, base_url)
  *
  * Unknown tokens are left intact so they remain visible to the recipient
@@ -98,7 +101,7 @@ class TokenReplacer
                 $resolved = match ($namespace) {
                     'field' => $this->resolveField($values, $key, $original),
                     'form'  => $this->resolveForm($form, $key, $original),
-                    'entry' => $this->resolveEntry($entry, $key, $original),
+                    'entry' => $this->resolveEntry($entry, $key, $original, $form, $values),
                     default => $this->resolveCustom($namespace, $key, $original),
                 };
 
@@ -136,9 +139,15 @@ class TokenReplacer
         };
     }
 
-    /** @param array<string, mixed> $entry */
-    private function resolveEntry(array $entry, string $key, string $original): string
+    /**
+     * @param array<string, mixed> $entry
+     * @param array<string, mixed> $values
+     */
+    private function resolveEntry(array $entry, string $key, string $original, FormDefinition $form, array $values): string
     {
+        if ($key === 'fields') {
+            return $this->renderFieldsTable($form, $values);
+        }
         if (! array_key_exists($key, $entry)) {
             return $original;
         }
@@ -153,5 +162,65 @@ class TokenReplacer
         }
         $value = ($this->providers[$namespace])($key);
         return $value === '' ? $original : $value;
+    }
+
+    /**
+     * Render every visible field as an inline-styled HTML key/value table.
+     *
+     * Skips fields whose `type` is `hidden`. Empty values render as an
+     * em-dash so the recipient can tell a field exists but wasn't filled in.
+     * Inline styles match the Postmark/Cerberus transactional aesthetic
+     * (40/60 split, right-aligned values, neutral grey palette) so the
+     * table looks reasonable inside any HTML email shell.
+     *
+     * @param array<string, mixed> $values
+     */
+    private function renderFieldsTable(FormDefinition $form, array $values): string
+    {
+        $rows = [];
+        foreach ($form->getAllFields() as $field) {
+            if ($field->type === 'hidden') {
+                continue;
+            }
+            $label = htmlspecialchars($field->label ?? $field->name, ENT_QUOTES, 'UTF-8');
+            $value = $this->renderFieldValue($field, $values[$field->name] ?? null);
+            $rows[] = '<tr>'
+                . '<td width="40%" style="width: 40%; padding: 10px 16px 10px 0; vertical-align: top; color: #51545E; font-size: 15px; line-height: 1.4;">' . $label . '</td>'
+                . '<td width="60%" align="right" style="width: 60%; padding: 10px 0; vertical-align: top; text-align: right; color: #51545E; font-size: 15px; line-height: 1.4;">' . $value . '</td>'
+                . '</tr>';
+        }
+
+        if ($rows === []) {
+            return '';
+        }
+
+        return '<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="width: 100%; border-collapse: collapse;">'
+            . implode('', $rows)
+            . '</table>';
+    }
+
+    private function renderFieldValue(FieldDefinition $field, mixed $value): string
+    {
+        if ($value === null || $value === '' || $value === []) {
+            return '&mdash;';
+        }
+        if (is_array($value)) {
+            $flat = array_filter($value, static fn ($v): bool => is_scalar($v));
+            if ($flat === []) {
+                return '&mdash;';
+            }
+            $value = implode(', ', array_map(static fn ($v): string => (string) $v, $flat));
+        }
+        if (! is_scalar($value)) {
+            return '&mdash;';
+        }
+
+        $string = (string) $value;
+
+        return match ($field->type) {
+            'checkbox' => ($string === '' || $string === '0') ? 'No' : 'Yes',
+            'textarea' => nl2br(htmlspecialchars($string, ENT_QUOTES, 'UTF-8')),
+            default    => htmlspecialchars($string, ENT_QUOTES, 'UTF-8'),
+        };
     }
 }

@@ -23,7 +23,7 @@ use Contenir\FormBuilder\Definition\FormDefinition;
  */
 class TokenReplacer
 {
-    /** @var array<string, callable(string): string> */
+    /** @var array<string, callable(string): ?string> */
     private array $providers = [];
 
     /**
@@ -32,16 +32,26 @@ class TokenReplacer
     public function __construct(array $siteContext = [])
     {
         if ($siteContext !== []) {
-            $this->register('site', static function (string $key) use ($siteContext): string {
-                return isset($siteContext[$key]) ? (string) $siteContext[$key] : '';
+            $this->register('site', static function (string $key) use ($siteContext): ?string {
+                if (! array_key_exists($key, $siteContext)) {
+                    return null;
+                }
+                $value = $siteContext[$key];
+                return is_scalar($value) ? (string) $value : '';
             });
         }
     }
 
     /**
-     * Register an additional namespace handler. Useful in tests and custom extensions.
+     * Register an additional namespace handler.
      *
-     * @param callable(string): string $resolver
+     * The resolver receives the token key (everything after the colon)
+     * and returns either a string to substitute (empty string is fine —
+     * means "explicitly empty") or null to leave the token untouched in
+     * the template (signals the key wasn't recognised, so typos remain
+     * visible to the editor).
+     *
+     * @param callable(string): ?string $resolver
      */
     public function register(string $namespace, callable $resolver): void
     {
@@ -161,7 +171,7 @@ class TokenReplacer
             return $original;
         }
         $value = ($this->providers[$namespace])($key);
-        return $value === '' ? $original : $value;
+        return $value === null ? $original : $value;
     }
 
     /**

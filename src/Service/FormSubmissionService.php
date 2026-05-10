@@ -92,13 +92,21 @@ class FormSubmissionService
             $built->registry = new \ArrayObject($registry, \ArrayObject::ARRAY_AS_PROPS);
         }
 
+        // Capture the timestamp once so {entry:date} reads identically
+        // for every observer rather than drifting by milliseconds across
+        // observer updates.
+        $submittedAt = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+
+        // Seed entry attributes BEFORE observers fire so notification
+        // templates can resolve {entry:date}, {entry:ip}, {entry:status}.
+        // Refreshed after each observer so {entry:id} picks up whatever
+        // the StoreSubmissionRegistrar (which runs first by convention)
+        // writes to registry['entry_id'] when persisting the submission.
+        $this->updateEntryRegistry($built, $context, $submittedAt);
+
         foreach ($this->observers as $observer) {
             $observer->update($built);
-        }
-
-        $entryAttrs = $this->buildEntryAttributes($built, $context);
-        if ($built instanceof BuilderForm && $built->registry instanceof \ArrayObject) {
-            $built->registry['entry'] = $entryAttrs;
+            $this->updateEntryRegistry($built, $context, $submittedAt);
         }
 
         return new SubmissionResult(
@@ -109,6 +117,15 @@ class FormSubmissionService
             isSpam: $isSpam,
             entryId: $this->extractEntryId($built),
         );
+    }
+
+    /** @param array<string, mixed> $context */
+    private function updateEntryRegistry(FormInterface $form, array $context, string $date): void
+    {
+        if (! ($form instanceof BuilderForm) || ! ($form->registry instanceof \ArrayObject)) {
+            return;
+        }
+        $form->registry['entry'] = $this->buildEntryAttributes($form, $context, $date);
     }
 
     /** @param array<string, mixed> $post */
@@ -252,11 +269,11 @@ class FormSubmissionService
      * @param array<string, mixed> $context
      * @return array<string, mixed>
      */
-    private function buildEntryAttributes(FormInterface $form, array $context): array
+    private function buildEntryAttributes(FormInterface $form, array $context, ?string $date = null): array
     {
         return [
             'id'     => $this->extractEntryId($form),
-            'date'   => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'date'   => $date ?? (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             'ip'     => $context['ip'] ?? '',
             'status' => ($form instanceof BuilderForm && $form->registry instanceof \ArrayObject)
                 ? $form->registry['entry_status'] ?? 'complete'

@@ -66,6 +66,48 @@ final class TokenReplacerTest extends TestCase
         self::assertSame('Visit https://admin.example', $result);
     }
 
+    public function testSiteContextWithMissingKeyPreservesToken(): void
+    {
+        $replacer = new TokenReplacer(['admin_url' => 'https://admin.example']);
+        $form     = new FormDefinition(id: 1, slug: 'x', title: 'X');
+
+        $result = $replacer->replace('Visit {site:not_set}', $form, [], []);
+
+        self::assertSame('Visit {site:not_set}', $result);
+    }
+
+    public function testSiteContextWithNullValueRendersEmpty(): void
+    {
+        $replacer = new TokenReplacer(['telephone' => null]);
+        $form     = new FormDefinition(id: 1, slug: 'x', title: 'X');
+
+        $result = $replacer->replace('Call {site:telephone} today', $form, [], []);
+
+        self::assertSame('Call  today', $result);
+    }
+
+    public function testCustomResolverReturningNullPreservesToken(): void
+    {
+        $replacer = new TokenReplacer();
+        $replacer->register('settings', static fn (string $key): ?string => null);
+        $form = new FormDefinition(id: 1, slug: 'x', title: 'X');
+
+        $result = $replacer->replace('Hello {settings:foo}', $form, [], []);
+
+        self::assertSame('Hello {settings:foo}', $result);
+    }
+
+    public function testCustomResolverReturningEmptyStringRendersEmpty(): void
+    {
+        $replacer = new TokenReplacer();
+        $replacer->register('settings', static fn (string $key): ?string => '');
+        $form = new FormDefinition(id: 1, slug: 'x', title: 'X');
+
+        $result = $replacer->replace('Hello {settings:foo}', $form, [], []);
+
+        self::assertSame('Hello ', $result);
+    }
+
     public function testReplaceForUrlEncodesResolvedValues(): void
     {
         $replacer = new TokenReplacer();
